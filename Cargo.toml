@@ -1,0 +1,56 @@
+[package]
+name = "postmini"
+version = "0.1.0"
+edition = "2021"
+description = "Lightweight Postman-compatible API client written in Rust"
+license = "MIT"
+
+[features]
+# build a console-subsystem executable on Windows (postmini-cli.exe)
+console = []
+
+[dependencies]
+eframe = { version = "0.37", default-features = false, features = ["glow", "default_fonts", "x11", "wayland"] }
+egui = { version = "0.37", default-features = false, features = ["default_fonts", "monochrome_emoji_fonts"] }
+egui_extras = { version = "0.37", default-features = false, features = ["image"] }
+image = { version = "0.25", default-features = false, features = ["png", "jpeg", "gif", "bmp", "ico", "webp"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["preserve_order"] }
+serde_yaml = "0.9"
+rquickjs = { version = "0.14", default-features = false }
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12", "logging"] }
+webpki-roots = "1"
+rustls-native-certs = "0.8"
+rustls-pemfile = "2"
+flate2 = "1"
+brotli-decompressor = "5"
+url = "2"
+percent-encoding = "2"
+cookie_store = { version = "0.22", default-features = false, features = ["serde_json"] }
+cookie = "0.18"
+tungstenite = { version = "0.30", default-features = false, features = ["handshake"] }
+sha1 = "0.10"
+sha2 = "0.10"
+md-5 = "0.10"
+hmac = "0.12"
+base64 = "0.22"
+hex = "0.4"
+rand = "0.8"
+uuid = { version = "1", features = ["v4"] }
+chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
+csv = "1"
+dirs = "6"
+
+[target.'cfg(windows)'.dependencies]
+rfd = { version = "0.15", default-features = false }
+windows-sys = { version = "0.61", features = ["Win32_System_Console"] }
+
+[profile.release]
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+strip = true
+panic = "unwind"
+
+[profile.dev]
+opt-level = 1

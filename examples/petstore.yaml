@@ -1,0 +1,25 @@
+openapi: 3.0.0
+info: {title: Petstore, version: "1.0"}
+servers: [{url: "http://127.0.0.1:8765/anything"}]
+components:
+  securitySchemes: {key: {type: apiKey, in: header, name: X-API-Key}}
+  schemas:
+    Pet: {type: object, required: [name], properties: {id: {type: integer, example: 7}, name: {type: string, example: Rex}, tags: {type: array, items: {type: string}}}}
+paths:
+  /pets:
+    get:
+      tags: [pets]
+      summary: List pets
+      parameters: [{name: limit, in: query, required: true, schema: {type: integer, example: 10}}]
+      responses: {"200": {description: ok, content: {application/json: {schema: {type: array, items: {$ref: '#/components/schemas/Pet'}}}}}}
+    post:
+      tags: [pets]
+      summary: Create pet
+      requestBody: {content: {application/json: {schema: {$ref: '#/components/schemas/Pet'}}}}
+      responses: {"201": {description: created}}
+  /pets/{petId}:
+    get:
+      tags: [pets]
+      operationId: showPetById
+      parameters: [{name: petId, in: path, required: true, schema: {type: string, example: "42"}}]
+      responses: {"200": {description: ok}}

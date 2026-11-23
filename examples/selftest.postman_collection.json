@@ -1,0 +1,746 @@
+{
+ "info": {
+  "name": "postmini selftest",
+  "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+ },
+ "auth": {
+  "type": "bearer",
+  "bearer": [
+   {
+    "key": "token",
+    "value": "{{token}}",
+    "type": "string"
+   }
+  ]
+ },
+ "event": [
+  {
+   "listen": "prerequest",
+   "script": {
+    "exec": [
+     "pm.collectionVariables.set('collPre', 'ok');"
+    ]
+   }
+  }
+ ],
+ "variable": [
+  {
+   "key": "cv",
+   "value": "1"
+  }
+ ],
+ "item": [
+  {
+   "name": "Echo GET with vars",
+   "request": {
+    "method": "GET",
+    "url": {
+     "raw": "{{base}}/get?user={{user}}&ts={{$timestamp}}&n={{nested}}",
+     "host": [
+      "{{base}}"
+     ],
+     "path": [
+      "get"
+     ],
+     "query": [
+      {
+       "key": "user",
+       "value": "{{user}}"
+      },
+      {
+       "key": "ts",
+       "value": "{{$timestamp}}"
+      },
+      {
+       "key": "n",
+       "value": "{{nested}}"
+      }
+     ]
+    },
+    "header": []
+   },
+   "event": [
+    {
+     "listen": "prerequest",
+     "script": {
+      "exec": [
+       "pm.variables.set('nested', '{{user}}-x'); pm.environment.set('fromPre', 'yes'); console.log('pre for', pm.info.requestName, pm.iterationData.get('user'));"
+      ],
+      "type": "text/javascript"
+     }
+    },
+    {
+     "listen": "test",
+     "script": {
+      "exec": [
+       "pm.test('status 200', () => pm.response.to.have.status(200));",
+       "pm.test('is ok', () => { pm.response.to.be.ok; pm.response.to.be.json; pm.response.to.have.header('Content-Type'); });",
+       "const j = pm.response.json();",
+       "pm.test('args resolved', () => { pm.expect(j.args.user).to.eql(pm.iterationData.get('user')); pm.expect(j.args.n).to.eql(pm.iterationData.get('user') + '-x'); pm.expect(Number(j.args.ts)).to.be.above(1600000000); });",
+       "pm.test('jsonBody path', () => pm.response.to.have.jsonBody('args.user'));",
+       "pm.test('collection pre ran', () => pm.expect(pm.collectionVariables.get('collPre')).to.equal('ok'));",
+       "pm.test('response time', () => pm.expect(pm.response.responseTime).to.be.below(5000));",
+       "pm.test('auth inherited bearer', () => pm.expect(j.headers.authorization).to.equal('Bearer tok-123'));",
+       "pm.test('default headers', () => { pm.expect(j.headers['postman-token']).to.match(/^[0-9a-f-]{36}$/); pm.expect(j.headers['cache-control']).to.eql('no-cache'); });",
+       "tests['legacy test works'] = responseCode.code === 200;"
+      ],
+      "type": "text/javascript"
+     }
+    }
+   ]
+  },
+  {
+   "name": "POST JSON + schema",
+   "request": {
+    "method": "POST",
+    "url": {
+     "raw": "{{base}}/post",
+     "host": [
+      "{{base}}"
+     ],
+     "path": [
+      "post"
+     ]
+    },
+    "header": [],
+    "body": {
+     "mode": "raw",
+     "raw": "{\n \"name\": \"{{$randomFirstName}}\",\n \"n\": 5\n}",
+     "options": {
+      "raw": {
+       "language": "json"
+      }
+     }
+    }
+   },
+   "event": [
+    {
+     "listen": "test",
+     "script": {
+      "exec": [
+       "const schema = {type:'object', required:['json'], properties:{ json: {type:'object', required:['name','n'], properties:{ n: {type:'integer', minimum: 1}}}}};",
+       "pm.test('schema', () => pm.response.to.have.jsonSchema(schema));",
+       "pm.test('content-type sent', () => pm.expect(pm.response.json().headers['content-type']).to.eql('application/json'));",
+       "pm.test('lodash', () => pm.expect(_.get(pm.response.json(), 'json.n')).to.eql(5));",
+       "pm.test('crypto-js', () => pm.expect(CryptoJS.SHA256('abc').toString()).to.eql('ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad'));",
+       "pm.test('moment', () => pm.expect(require('moment')('2024-01-02').format('YYYY/MM/DD')).to.eql('2024/01/02'));",
+       "pm.test('btoa/atob', () => pm.expect(atob(btoa('hi there'))).to.eql('hi there'));",
+       "const tv4 = require('tv4'); pm.test('tv4', () => pm.expect(tv4.validate({a:1}, {type:'object'})).to.be.true);"
+      ],
+      "type": "text/javascript"
+     }
+    }
+   ]
+  },
+  {
+   "name": "Urlencoded + basic auth (folder-less override)",
+   "request": {
+    "method": "POST",
+    "url": {
+     "raw": "{{base}}/basic-auth/u1/p1",
+     "host": [
+      "{{base}}"
+     ],
+     "path": [
+      "basic-auth",
+      "u1",
+      "p1"
+     ]
+    },
+    "header": [],
+    "auth": {
+     "type": "basic",
+     "basic": [
+      {
+       "key": "username",
+       "value": "u1"
+      },
+      {
+       "key": "password",
+       "value": "p1"
+      }
+     ]
+    }
+   },
+   "event": [
+    {
+     "listen": "test",
+     "script": {
+      "exec": [
+       "pm.test('basic ok', () => pm.expect(pm.response.json().authenticated).to.be.true);"
+      ],
+      "type": "text/javascript"
+     }
+    }
+   ]
+  },
+  {
+   "name": "Multipart with file",
+   "request": {
+    "method": "POST",
+    "url": {
+     "raw": "{{base}}/post",
+     "host": [
+      "{{base}}"
+     ],
+     "path": [
+      "post"
+     ]
+    },
+    "header": [],
+    "body": {
+     "mode": "formdata",
+     "formdata": [
+      {
+       "key": "a",
+       "value": "1",
+       "type": "text"
+      },
+      {
+       "key": "f",
+       "type": "file",
+       "src": "upload.txt"
+      },
+      {
+       "key": "off",
+       "value": "x",
+       "disabled": true
+      }
+     ]
+    }
+   },
+   "event": [
+    {
+     "listen": "test",
+     "script": {
+      "exec": [
+       "const j = pm.response.json();",
+       "pm.test('form field', () => pm.expect(j.form.a).to.eql('1'));",
+       "pm.test('disabled skipped', () => pm.expect(j.form).to.not.have.property('off'));",
+       "pm.test('file uploaded', () => pm.expect(atob(j.files['upload.txt'].split(',')[1])).to.eql('hello file\\n'));"
+      ],
+      "type": "text/javascript"
+     }
+    }
+   ]
+  },
+  {
+   "name": "Urlencoded",
+   "request": {
+    "method": "PUT",
+    "url": {
+     "raw": "{{base}}/put",
+     "host": [
+      "{{base}}"
+     ],
+     "path": [
+      "put"
+     ]
+    },
+    "header": [],
+    "body": {
+     "mode": "urlencoded",
+     "urlencoded": [
+      {
+       "key": "a b",
+       "value": "c&d"
+      },
+      {
+       "key": "x",
+       "value": "{{user}}"
+      }
+     ]
+    }
+   },
+   "event": [
+    {
+     "listen": "test",
+     "script": {
+      "exec": [
+       "pm.test('form', () => { pm.expect(pm.response.json().form['a b']).to.eql('c&d'); pm.expect(pm.response.json().form.x).to.eql(pm.iterationData.get('user')); });"
+      ],
+      "type": "text/javascript"
+     }
+    }
+   ]
+  },
+  {
+   "name": "GraphQL",
+   "request": {
+    "method": "POST",
+    "url": {
+     "raw": "{{base}}/post",
+     "host": [
+      "{{base}}"
+     ],
+     "path": [
+      "post"
+     ]
+    },
+    "header": [],
+    "body": {
+     "mode": "graphql",
+     "graphql": {
+      "query": "query { user(id: 1) { name } }",
+      "variables": "{\"id\": 1}"
+     }
+    }
+   },
+   "event": [
+    {
+     "listen": "test",
+     "script": {
+      "exec": [
+       "pm.test('graphql body', () => { const j = pm.response.json().json; pm.expect(j.query).to.include('user'); pm.expect(j.variables.id).to.eql(1); });"
+      ],
+      "type": "text/javascript"
+     }
+    }
+   ]
+  },
+  {
+   "name": "Path variables",
+   "request": {
+    "method": "GET",
+    "url": {
+     "raw": "{{base}}/anything/:kind/:id",
+     "variable": [
+      {
+       "key": "kind",
+       "value": "users"
+      },
+      {
+       "key": "id",
+       "value": "{{user}}"
+      }
+     ],
+     "host": [
+      "{{base}}"
+     ],
+     "path": [
+      "anything",
+      ":kind",
+      ":id"
+     ]
+    },
+    "header": []
+   },
+   "event": [
+    {
+     "listen": "test",
+     "script": {
+      "exec": [
+       "pm.test('path resolved', () => pm.expect(pm.response.json().url).to.include('/anything/users/' + pm.iterationData.get('user')));"
+      ],
+      "type": "text/javascript"
+     }
+    }
+   ]
+  },
+  {
+   "name": "Redirect chain + gzip",
+   "request": {
+    "method": "GET",
+    "url": {
+     "raw": "{{base}}/redirect/3",
+     "host": [
+      "{{base}}"
+     ],
+     "path": [
+      "redirect",
+      "3"
+     ]
+    },
+    "header": []
+   },
+   "event": [
+    {
+     "listen": "test",
+     "script": {
+      "exec": [
+       "pm.test('followed', () => pm.expect(pm.response.json().url).to.include('/get'));"
+      ],
+      "type": "text/javascript"
+     }
+    }
+   ]
+  },
+  {
+   "name": "Gzip",
+   "request": {
+    "method": "GET",
+    "url": {
+     "raw": "{{base}}/gzip",
+     "host": [
+      "{{base}}"
+     ],
+     "path": [
+      "gzip"
+     ]
+    },
+    "header": []
+   },
+   "event": [
+    {
+     "listen": "test",
+     "script": {
+      "exec": [
+       "pm.test('gzip decoded', () => pm.expect(pm.response.json().gzipped).to.be.true);"
+      ],
+      "type": "text/javascript"
+     }
+    }
+   ]
+  },
+  {
+   "name": "Chunked",
+   "request": {
+    "method": "GET",
+    "url": {
+     "raw": "{{base}}/stream/5",
+     "host": [
+      "{{base}}"
+     ],
+     "path": [
+      "stream",
+      "5"
+     ]
+    },
+    "header": []
+   },
+   "event": [
+    {
+     "listen": "test",
+     "script": {
+      "exec": [
+       "pm.test('5 lines', () => pm.expect(pm.response.text().trim().split('\\n').length).to.eql(5));"
+      ],
+      "type": "text/javascript"
+     }
+    }
+   ]
+  },
+  {
+   "name": "Cookies",
+   "request": {
+    "method": "GET",
+    "url": {
+     "raw": "{{base}}/cookies/set?sess=abc",
+     "host": [
+      "{{base}}"
+     ],
+     "path": [
+      "cookies",
+      "set"
+     ],
+     "query": [
+      {
+       "key": "sess",
+       "value": "abc"
+      }
+     ]
+    },
+    "header": []
+   },
+   "event": [
+    {
+     "listen": "test",
+     "script": {
+      "exec": [
+       "pm.test('cookie roundtrip', () => pm.expect(pm.response.json().cookies.sess).to.eql('abc'));",
+       "pm.test('pm.cookies', () => pm.expect(pm.cookies.has('sess')).to.be.true);",
+       "const jar = pm.cookies.jar(); jar.set(pm.environment.get('base'), 'manual', 'm1', (err) => { pm.test('jar set no error', () => pm.expect(err).to.be.null); });"
+      ],
+      "type": "text/javascript"
+     }
+    }
+   ]
+  },
+  {
+   "name": "Digest auth",
+   "request": {
+    "method": "GET",
+    "url": {
+     "raw": "{{base}}/digest-auth/auth/dig/pw",
+     "host": [
+      "{{base}}"
+     ],
+     "path": [
+      "digest-auth",
+      "auth",
+      "dig",
+      "pw"
+     ]
+    },
+    "header": [],
+    "auth": {
+     "type": "digest",
+     "digest": [
+      {
+       "key": "username",
+       "value": "dig"
+      },
+      {
+       "key": "password",
+       "value": "pw"
+      }
+     ]
+    }
+   },
+   "event": [
+    {
+     "listen": "test",
+     "script": {
+      "exec": [
+       "pm.test('digest ok', () => pm.response.to.have.status(200));"
+      ],
+      "type": "text/javascript"
+     }
+    }
+   ]
+  },
+  {
+   "name": "XML",
+   "request": {
+    "method": "GET",
+    "url": {
+     "raw": "{{base}}/xml",
+     "host": [
+      "{{base}}"
+     ],
+     "path": [
+      "xml"
+     ]
+    },
+    "header": []
+   },
+   "event": [
+    {
+     "listen": "test",
+     "script": {
+      "exec": [
+       "const x = xml2Json(pm.response.text()); pm.test('xml', () => { pm.expect(x.root.item.length).to.eql(2); pm.expect(x.root.name).to.eql('x & y'); pm.expect(x.root.$.a).to.eql('1'); });"
+      ],
+      "type": "text/javascript"
+     }
+    }
+   ]
+  },
+  {
+   "name": "sendRequest + async + timers",
+   "request": {
+    "method": "GET",
+    "url": {
+     "raw": "{{base}}/get",
+     "host": [
+      "{{base}}"
+     ],
+     "path": [
+      "get"
+     ]
+    },
+    "header": []
+   },
+   "event": [
+    {
+     "listen": "prerequest",
+     "script": {
+      "exec": [
+       "pm.sendRequest(pm.environment.get('base') + '/headers', (err, res) => { pm.environment.set('sr', res.code); });",
+       "const r = await pm.sendRequest({ url: pm.environment.get('base') + '/post', method: 'POST', header: {'X-A': '1'}, body: { mode: 'raw', raw: JSON.stringify({q: 1}) } });",
+       "pm.variables.set('srAsync', r.json().data);",
+       "await new Promise(res => setTimeout(res, 200));",
+       "pm.variables.set('afterTimer', 'done');"
+      ],
+      "type": "text/javascript"
+     }
+    },
+    {
+     "listen": "test",
+     "script": {
+      "exec": [
+       "pm.test('sendRequest cb', () => pm.expect(pm.environment.get('sr')).to.eql(200));",
+       "pm.test('sendRequest await', () => pm.expect(pm.variables.get('srAsync')).to.eql('{\"q\":1}'));",
+       "pm.test('timer', () => pm.expect(pm.variables.get('afterTimer')).to.eql('done'));",
+       "pm.test('async test', async () => { await new Promise(r => setTimeout(r, 50)); pm.expect(1).to.eql(1); });",
+       "pm.test.skip('skipped one', () => {});"
+      ],
+      "type": "text/javascript"
+     }
+    }
+   ]
+  },
+  {
+   "name": "Pre-request modifies request",
+   "request": {
+    "method": "GET",
+    "url": {
+     "raw": "{{base}}/get",
+     "host": [
+      "{{base}}"
+     ],
+     "path": [
+      "get"
+     ]
+    },
+    "header": []
+   },
+   "event": [
+    {
+     "listen": "prerequest",
+     "script": {
+      "exec": [
+       "pm.request.headers.add({key: 'X-Added', value: 'yes'}); pm.request.url.query.add({key: 'q', value: '42'}); pm.request.headers.upsert({key: 'X-Up', value: '{{user}}'});"
+      ],
+      "type": "text/javascript"
+     }
+    },
+    {
+     "listen": "test",
+     "script": {
+      "exec": [
+       "const j = pm.response.json(); pm.test('header added', () => pm.expect(j.headers['x-added']).to.eql('yes')); pm.test('query added', () => pm.expect(j.args.q).to.eql('42')); pm.test('upsert resolved', () => pm.expect(j.headers['x-up']).to.eql(pm.iterationData.get('user')));"
+      ],
+      "type": "text/javascript"
+     }
+    }
+   ]
+  },
+  {
+   "name": "HTTPS self-signed (insecure)",
+   "request": {
+    "method": "GET",
+    "url": {
+     "raw": "{{secure}}/get",
+     "host": [
+      "{{secure}}"
+     ],
+     "path": [
+      "get"
+     ]
+    },
+    "header": []
+   },
+   "event": [
+    {
+     "listen": "test",
+     "script": {
+      "exec": [
+       "pm.test('tls ok', () => pm.response.to.have.status(200));"
+      ],
+      "type": "text/javascript"
+     }
+    }
+   ]
+  },
+  {
+   "name": "Expected failure",
+   "request": {
+    "method": "GET",
+    "url": {
+     "raw": "{{base}}/status/404",
+     "host": [
+      "{{base}}"
+     ],
+     "path": [
+      "status",
+      "404"
+     ]
+    },
+    "header": []
+   },
+   "event": [
+    {
+     "listen": "test",
+     "script": {
+      "exec": [
+       "pm.test('this fails on purpose', () => pm.response.to.have.status(200)); pm.test('notFound', () => pm.response.to.be.notFound);"
+      ],
+      "type": "text/javascript"
+     }
+    }
+   ]
+  },
+  {
+   "name": "Jump",
+   "request": {
+    "method": "GET",
+    "url": {
+     "raw": "{{base}}/get",
+     "host": [
+      "{{base}}"
+     ],
+     "path": [
+      "get"
+     ]
+    },
+    "header": []
+   },
+   "event": [
+    {
+     "listen": "test",
+     "script": {
+      "exec": [
+       "if (pm.info.iteration === 0) { postman.setNextRequest('Final'); }"
+      ],
+      "type": "text/javascript"
+     }
+    }
+   ]
+  },
+  {
+   "name": "Skipped by jump in iter 0",
+   "request": {
+    "method": "GET",
+    "url": {
+     "raw": "{{base}}/get",
+     "host": [
+      "{{base}}"
+     ],
+     "path": [
+      "get"
+     ]
+    },
+    "header": []
+   },
+   "event": [
+    {
+     "listen": "test",
+     "script": {
+      "exec": [
+       "pm.test('only iter 1', () => pm.expect(pm.info.iteration).to.eql(1));"
+      ],
+      "type": "text/javascript"
+     }
+    }
+   ]
+  },
+  {
+   "name": "Final",
+   "request": {
+    "method": "GET",
+    "url": {
+     "raw": "{{base}}/get",
+     "host": [
+      "{{base}}"
+     ],
+     "path": [
+      "get"
+     ]
+    },
+    "header": []
+   },
+   "event": [
+    {
+     "listen": "test",
+     "script": {
+      "exec": [
+       "pm.test('env from pre persisted', () => pm.expect(pm.environment.get('fromPre')).to.eql('yes')); pm.collectionVariables.set('runs', (pm.collectionVariables.get('runs')||0) + 1);"
+      ],
+      "type": "text/javascript"
+     }
+    }
+   ]
+  }
+ ]
+}
